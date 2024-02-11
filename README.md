@@ -4,7 +4,7 @@ This repository contains the data and scripts required by the BrainRBPedia datab
 
 ## :desktop_computer: Instructions
 1. Download this repository to your local machine.
-2. Files used to generate human and neuron markers are too large to be stored in this repository - please download them from the email and add them to the "data" folder.
+2. Files used to generate human and neuron markers are too large to be stored in this repository - please download folder <code>visp_data</code> and <code>Seu_AIBS_obj_update_07JUN21.rds</code> from [Dropbox](https://www.dropbox.com/scl/fo/s3saavuho0yoexgqu1wm5/h?rlkey=6t9nthzllswqz6egonfi7mpp6&dl=0) and add them to the <code>data</code> folder.
 
 ## :green_book: Description
 
