@@ -29,6 +29,6 @@ This repository contains the data and scripts required by the BrainRBPedia datab
 * This script generates “Figure 3: Informative RBP and non-RBP features for ASD and ID susceptibility gene prediction obtained from the penalized multivariate logistic regression models” in the BrainRBPedia manuscript.
 
 :dna: **plot_auc_curves_fig4.R**
-This script generates “Figure 4: ASD and ID model performance measured by ROC and PR curves” in the BrainRBPedia manuscript.
+* This script generates “Figure 4: ASD and ID model performance measured by ROC and PR curves” in the BrainRBPedia manuscript.
 
 
