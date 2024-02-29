@@ -3,19 +3,23 @@
 # Purpose: This script generates "Figure 3: Informative RBP and non-RBP features 
 #          for ASD and ID susceptibility gene prediction obtained from the penalized 
 #          multivariate logistic regression models" in the BrainRBPedia manuscript.
-# Prerequisite: Run nested_cv.R to obtain objects "autism_res" and "id_res" before
-#               running this script.
+# Prerequisite: Run nested_cv.R and nested_cv_nonRBPs.R to obtain objects "autism_res", 
+#               "id_res", "autism_res2", and "id_res2" before running this script.
 # ---
 
+library(data.table)
+library(dplyr)
 library(ggplot2)
-library(cowplot)
 library(ggbeeswarm)
-library(xlsx)
 
-setwd("~/Desktop/BrainRBPedia") # CHANGE THIS
-
-
-# SETUP -------------------------------------------------------------------
+# Brain enrichment
+# Neuron developmental enrichment (early)
+# Neuron developmental enrichment (late)
+# Extreme pLI
+# High pLI
+# Medium pLI
+# Neuron enrichment (mouse)
+# Neuron enrichment (human)
 
 get_beeswarm_tb <- function(res, K) {
   
@@ -55,41 +59,33 @@ get_beeswarm_tb <- function(res, K) {
   return(tb)
 }
 
-# Run nested_cv.R to get autism_res and id_res
+# NOTE: autism_tb is for RBPs; autism_tb2 is for non-RBPs
 autism_tb <- get_beeswarm_tb(autism_res, K = 5)
-id_tb <- get_beeswarm_tb(id_res, K = 5)
+autism_tb2 <- get_beeswarm_tb(autism_res2, K = 5)
 
 autism_tb <- rbind(autism_tb, 
                    data.frame(coef = rep(0, 5),
+                              variable = rep("Brain enrichment", 5) ))
+autism_tb <- rbind(autism_tb, 
+                   data.frame(coef = rep(0, 5),
                               variable = rep("Neuron developmental enrichment (early)", 5) ))
-id_tb <- rbind(id_tb, 
-               data.frame(coef = rep(0, 10),
-                          variable = c( rep("high_pLI", 5),
-                                        rep("Neuron developmental enrichment (late)", 5) ) ))
+autism_tb <- autism_tb[order(autism_tb$variable),]
+autism_tb$group <- "RBP"
 
-autism_tb$disorder <- "ASD"
-id_tb$disorder <- "ID"
+autism_tb2 <- autism_tb2[!autism_tb2$variable == "Neuron enrichment (mouse)", ]
+autism_tb2$group <- "non-RBP"
+autism_all <- rbind(autism_tb, autism_tb2)
+autism_all$variable[autism_all$variable == "Neuron developmental enrichment (early)"] <- "Early developmental enrichment"
+autism_all$variable[autism_all$variable == "Neuron developmental enrichment (late)"] <- "Late developmental enrichment"
+autism_all$odds_ratio <- exp(autism_all$coef)
 
-all_tb <- rbind(autism_tb, id_tb)
-all_tb$variable <- gsub("extreme_pLI", "Extreme pLI", all_tb$variable)
-all_tb$variable <- gsub("high_pLI", "High pLI", all_tb$variable)
-all_tb$variable <- gsub("Neuron developmental enrichment [[:punct:]]early[[:punct:]]", "Early neuron development", all_tb$variable)
-all_tb$variable <- gsub("Neuron developmental enrichment [[:punct:]]late[[:punct:]]", "Late neuron development", all_tb$variable)
-
-all_tb$variable <- factor(all_tb$variable, 
-                          levels = c("Extreme pLI", 
-                                     "High pLI", 
-                                     "Late neuron development", 
-                                     "Early neuron development"))
-all_tb$coef <- exp(all_tb$coef)
-names(all_tb)[1] <- "Odds ratio"
-
-CIs <- all_tb %>% group_by(variable, disorder) %>% summarize(Mean = mean(`Odds ratio`)) %>% ungroup()
-groups <- seq(1, 40, by = 5)
+autism_CIs <- autism_all %>% group_by(variable, group) %>% summarize(Mean = mean(odds_ratio)) %>% ungroup()
+autism_all <- autism_all[order(autism_all$variable), ]
+groups <- seq(1, 50, by = 5)
 CI_low <- numeric(0)
 CI_high <- numeric(0)
 for (i in groups) {
-  members <- all_tb$`Odds ratio`[i:(i+5-1)]
+  members <- autism_all$odds_ratio[i:(i+5-1)]
   if (sum(members) == 5) {
     CI_low <- c(CI_low, 0)
     CI_high <- c(CI_high, 0)
@@ -100,38 +96,30 @@ for (i in groups) {
   CI_high <- c(CI_high, ci[2])
 }
 
-CIs$CI_low <- CI_low[c(1,5,2,7,3,8,4,6)]
-CIs$CI_high <- CI_high[c(1,5,2,7,3,8,4,6)]
-
-CIs <- as.data.frame(CIs)
-
-write.xlsx(all_tb, "./tables/TableS4_odds_ratios.xlsx", sheetName = "Sheet 1", row.names = FALSE)
-write.xlsx(CIs, "./tables/TableS4_odds_ratios.xlsx", sheetName = "Sheet 2", 
-           row.names = FALSE, append = TRUE)
-
-# 2-in-1 Beeswarm Plot ----------------------------------------------------
+autism_CIs$CI_low <- CI_low
+autism_CIs$CI_high <- CI_high
+autism_CIs <- as.data.frame(autism_CIs)
+autism_CIs$group <- factor(autism_CIs$group, levels = c("RBP", "non-RBP"))
+autism_all$group <- factor(autism_all$group, levels = c("RBP", "non-RBP"))
 
 cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-
-level_order <- c("Extreme pLI", "High pLI", "Late neuron development", "Early neuron development")
-CIs$variable <- factor(CIs$variable, level = level_order)
-
-fig3 <- ggplot(CIs, aes(x = variable, color = as.factor(disorder))) +
-  geom_beeswarm(data = all_tb, aes(x = variable, y = `Odds ratio`, fill = as.factor(disorder)), size = 2, dodge.width = 0.5, shape = 21, color = "black") +
-  geom_errorbar(aes(ymin = CI_low, ymax = CI_high), position = position_dodge(0.5), width = 0) +
-  geom_point(aes(y = Mean), position = position_dodge(0.5), shape = 3, size = 5) + # to add mean to the error bars
-  # geom_point(data = all_tb, aes(x = variable, y = `Odds ratio`, color = as.factor(disorder))) +
+p_aut <- ggplot(autism_CIs, aes(x = variable, color = as.factor(group))) +
+  geom_beeswarm(data = autism_all, aes(x = variable, y = odds_ratio, fill = as.factor(group)), size = 2, dodge.width = 0.6, shape = 21, color = "black") +
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high), position = position_dodge(0.6), width = 0) +
+  geom_point(aes(y = Mean), position = position_dodge(0.6), shape = 3, size = 5) + # to add mean to the error bars
+  ylab("Odds ratio") +
   scale_color_manual(values = cbPalette) +
   scale_fill_manual(values = cbPalette) +
-  scale_x_discrete(limits = level_order) +
-  scale_y_continuous(breaks = seq(0, 9, by = 1),
-                     limits = c(0.5, 5.5)) +
-  guides(x.sec = "axis", y.sec = "axis") +
+  scale_x_discrete(limits = c("Extreme pLI", 
+                              "High pLI", 
+                              "Late developmental enrichment", 
+                              "Brain enrichment",
+                              "Early developmental enrichment")) +
   theme_bw() + 
   theme(axis.title.x = element_blank(), 
-        axis.title.y = element_text(face = "bold", size = 14),
-        axis.text.x.bottom = element_text(face = "bold", size = 14, color = "black"),
-        axis.text.y.left = element_text(face = "bold", size = 14, color = "black"),
+        axis.title.y = element_text(face = "bold", size = 10),
+        axis.text.x.bottom = element_text(face = "bold", size = 9, color = "black"),
+        axis.text.y.left = element_text(face = "bold", size = 10, color = "black"),
         axis.text.x.top = element_blank(),
         axis.ticks.x.top = element_blank(),
         axis.text.y.right = element_blank(),
@@ -142,7 +130,73 @@ fig3 <- ggplot(CIs, aes(x = variable, color = as.factor(disorder))) +
         legend.title = element_blank(),
         legend.position = c(0.9, 0.82),
         legend.background = element_blank(),
-        legend.text = element_text(face = "bold", size = 14)) 
-fig3
+        legend.text = element_text(face = "bold", size = 12)) 
+p_aut
 
-ggsave("./figures/BrainRBPedia_Figure3.jpg", fig3, width = 300, height = 200, units = c("mm"))
+id_tb <- get_beeswarm_tb(id_res, K = 5)
+id_tb2 <- get_beeswarm_tb(id_res2, K = 5)
+
+id_tb <- rbind(id_tb, 
+               data.frame(coef = rep(0, 5),
+                          variable = rep("High pLI", 5) ))
+id_tb2 <- rbind(id_tb2, 
+               data.frame(coef = rep(0, 5),
+                          variable = rep("Neuron developmental enrichment (early)", 5) ))
+id_tb <- id_tb[order(id_tb$variable), ]
+id_tb$group <- "RBP"
+id_tb2$group <- "non-RBP"
+id_all <- rbind(id_tb, id_tb2)
+id_all$odds_ratio <- exp(id_all$coef)
+
+id_CIs <- id_all %>% group_by(variable, group) %>% summarize(Mean = mean(odds_ratio)) %>% ungroup()
+id_all <- id_all[order(id_all$variable), ]
+id_CIs$group <- factor(id_CIs$group, levels = c("RBP", "non-RBP"))
+id_all$group <- factor(id_all$group, levels = c("RBP", "non-RBP"))
+groups <- seq(1, 30, by = 5)
+CI_low <- numeric(0)
+CI_high <- numeric(0)
+for (i in groups) {
+  members <- id_all$odds_ratio[i:(i+5-1)]
+  if (sum(members) == 5) {
+    CI_low <- c(CI_low, 0)
+    CI_high <- c(CI_high, 0)
+    next
+  }
+  ci <- as.numeric(t.test(members, conf.level = 0.95)$conf.int)
+  CI_low <- c(CI_low, ci[1])
+  CI_high <- c(CI_high, ci[2])
+}
+
+id_CIs$CI_low <- CI_low
+id_CIs$CI_high <- CI_high
+id_CIs <- as.data.frame(id_CIs)
+
+p_id <- ggplot(id_CIs, aes(x = variable, color = as.factor(group))) +
+  geom_beeswarm(data = id_all, aes(x = variable, y = odds_ratio, fill = as.factor(group)), size = 2, dodge.width = 0.5, shape = 21, color = "black") +
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high), position = position_dodge(0.5), width = 0) +
+  geom_point(aes(y = Mean), position = position_dodge(0.5), shape = 3, size = 5) + # to add mean to the error bars
+  ylab("Odds ratio") +
+  scale_color_manual(values = cbPalette) +
+  scale_fill_manual(values = cbPalette) +
+  theme_bw() + 
+  theme(axis.title.x = element_blank(), 
+        axis.title.y = element_text(face = "bold", size = 10),
+        axis.text.x.bottom = element_text(face = "bold", size = 9, color = "black"),
+        axis.text.y.left = element_text(face = "bold", size = 10, color = "black"),
+        axis.text.x.top = element_blank(),
+        axis.ticks.x.top = element_blank(),
+        axis.text.y.right = element_blank(),
+        axis.ticks.y.right = element_blank(),
+        axis.line.x = element_line(color = "black"),
+        axis.line.y = element_line(color = "black"),
+        panel.grid.major.x = element_blank(),
+        legend.title = element_blank(),
+        legend.position = c(0.9, 0.82),
+        legend.background = element_blank(),
+        legend.text = element_text(face = "bold", size = 12)) 
+p_id
+
+fig3 <- plot_grid(p_aut, p_id, nrow = 2, ncol = 1, labels = c("A", "B"))
+fig3
+ggsave("./figures/BrainRBPedia_Figure3.jpg", fig3, 
+       width = 300, height = 200, units = c("mm"))
