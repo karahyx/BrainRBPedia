@@ -14,7 +14,10 @@ This repository contains the data and scripts required by the BrainRBPedia datab
 * I recommend using get_human_neuron_markers.R and get_mouse_neuron_markers.R to re-generate the neuron markers as I wasn’t able to use the most optimal parameters due to my machine’s computational limit (we can discuss more about this when we meet).
 
 :dna: **nested_cv.R**
-* This script uses nested cross-validation to construct the logistic regression model that predicts ASD and ID susceptibility.
+* This script uses nested cross-validation to construct the logistic regression model that predicts ASD and ID susceptibility for RBPs.
+
+:dna: **nested_cv_nonRBPs.R**
+* This script uses nested cross-validation to construct the logistic regression model that predicts ASD and ID susceptibility for protein-coding non-RBPs obtained from GENCODE release 44. See manuscript for details.
 
 :dna: **get_human_neuron_markers.R**
 * This script uses the Seurat R package to generate each RBP’s log2 fold-change of gene expression in human neurons relative to non-neurons.
@@ -27,6 +30,7 @@ This repository contains the data and scripts required by the BrainRBPedia datab
 
 :dna: **plot_beta_coef_fig3.R**
 * This script generates “Figure 3: Informative RBP and non-RBP features for ASD and ID susceptibility gene prediction obtained from the penalized multivariate logistic regression models” in the BrainRBPedia manuscript.
+* Prerequisite: run `nested_cv.R` and `nested_cv_nonRBPs.R` to obtain required objects `autism_tb`, `id_tb`, `autism_tb2`, and `id_tb2` first.
 
 :dna: **plot_auc_curves_fig4.R**
 * This script generates “Figure 4: ASD and ID model performance measured by ROC and PR curves” in the BrainRBPedia manuscript.
